@@ -229,12 +229,6 @@ def create_houses_consumption_table(cnx):
       cursor.close()
             
 
-def create_table_from_csv_headers(conn, table_name, csv_file_path):
-    """
-    Creates a table in the database based on the headers of a CSV file.
-    Adds an auto-incrementing 'id' column as the primary key.
-    Infers basic data types for columns.
-    """
     try:
         df = pd.read_csv(csv_file_path)
         if df.empty:
@@ -321,12 +315,7 @@ if __name__ == "__main__":
             create_houses_table(cnn)
             create_houses_consumption_table(cnn)
             
-            # Example: If you plan to use create_table_from_csv_headers
-            # if CSV_FILE_PATH:
-            #     print(f"Attempting to create table from CSV: {CSV_FILE_PATH}")
-            #     create_table_from_csv_headers(cnn, 'csv_data_table', CSV_FILE_PATH)
-            # else:
-            #     print("INFO: CSV_FILE_PATH is not set in .env. Skipping CSV table creation.")
+
 
     except Exception as main_ex:
         print(f"CRITICAL ERROR: An unhandled exception occurred in the main block: {main_ex}")
