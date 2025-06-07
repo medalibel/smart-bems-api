@@ -127,6 +127,9 @@ def create_houses_table(conn):
             `construction_year` INT,
             `total_square_footage` FLOAT,
             `first_floor_square_footage` FLOAT,
+            `state` VARCHAR(50),
+            `city` VARCHAR(50),
+            `building_type` VARCHAR(50),
             `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id, user_id),
             FOREIGN KEY (user_id) REFERENCES users(id)
@@ -137,9 +140,9 @@ def create_houses_table(conn):
         conn.commit()
         print("Houses table created successfully or already exists.")
         # Optionally, insert a default house (if needed)
-        #cursor.execute("INSERT INTO houses (id, user_id, construction_year) VALUES (%s, %s, %s)", (house_id, 1, 1999))
-        #conn.commit()
-        #print("Default house inserted into the houses table.")
+        cursor.execute("INSERT INTO houses (id, user_id, construction_year, state, city, building_type) VALUES (%s, %s, %s, %s, %s, %s)", (house_id, 1, 1999, 'texas', 'austin', 'single-family home'))
+        conn.commit()
+        print("Default house inserted into the houses table.")
         cursor.close()
     except Error as e:
         print(f"Error creating houses table: {e}")

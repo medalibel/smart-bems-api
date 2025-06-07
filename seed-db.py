@@ -32,7 +32,20 @@ def load_data():
     df = pd.read_csv(file_path)  
 
     
-    df = df.drop(['dataid', 'house_construction_year','total_square_footage', 'first_floor_square_footage' ], axis=1, errors='ignore')  # Drop columns that are not needed
+    #df = df.drop(['dataid', 'house_construction_year','total_square_footage', 'first_floor_square_footage' ], axis=1, errors='ignore')  # Drop columns that are not needed
+    df = df['local_15min', 'bathroom1', 'bedroom1', 'bedroom2',
+       'clotheswasher1', 'livingroom1', 'dishwasher1', 'garage1', 'kitchen1',
+       'kitchenapp1', 'kitchenapp2', 'lights_plugs1', 'lights_plugs2',
+       'lights_plugs3', 'microwave1', 'office1', 'range1', 'refrigerator1',
+       'venthood1', 'oven1', 'total_energy', 'Weekday',
+       'Month', 'Hour', 'Hour_sin', 'Hour_cos', 'DoW_sin', 'DoW_cos',
+       'bathroom1_present', 'bedroom1_present', 'bedroom2_present',
+       'clotheswasher1_present', 'livingroom1_present', 'dishwasher1_present',
+       'garage1_present', 'kitchen1_present', 'kitchenapp1_present',
+       'kitchenapp2_present', 'lights_plugs1_present', 'lights_plugs2_present',
+       'lights_plugs3_present', 'microwave1_present', 'office1_present',
+       'range1_present', 'refrigerator1_present', 'venthood1_present',
+       'oven1_present']
     df.rename(columns={'local_15min': 'date_time'}, inplace=True)
 
     # Add the house_id column
