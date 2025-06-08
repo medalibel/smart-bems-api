@@ -30,7 +30,7 @@ This is a Flask-based backend API for managing and analyzing energy consumption 
   ```
 
   ```bash
-  pip install Flask Flask-MySQLdb Flask-Cors python-dotenv pandas mysql-connector-python
+  pip install Flask Flask-MySQLdb Flask-Cors python-dotenv pandas mysql-connector-python pyjwt
   ```
 
 ## Setup

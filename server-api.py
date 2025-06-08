@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request, Response, send_file
 from flask_mysqldb import MySQL
 from flask_cors import CORS
+import jwt
 import os
 import io
 import csv
@@ -17,6 +18,7 @@ DB_USER = os.getenv('DB_USER')  # Replace with your MySQL username
 DB_PASSWORD = os.getenv('DB_PASSWORD')  # Replace with your MySQL password
 DB_NAME = os.getenv('DB_NAME','bems_db')  # Name of the database to create/use
 DB_PORT = int(os.getenv('DB_PORT', 3306)) 
+SECRET_KEY = os.getenv('SECRET_KEY', 'your_secret_key')  # Replace with your secret key for JWT
 
 # yyyymmdd hh:mm:ss format
 # Default date for testing purposes
@@ -28,7 +30,8 @@ DATE_TODAY = datetime(2025,6,1,12,0,0) #'2025-06-01 12:00:00'  # Example date, a
 #AND house_id = 3538;
 
 app = Flask(__name__)
-CORS(app,expose_headers=["Content-Disposition"]) # This will enable CORS for all routes
+app.config['SECRET_KEY'] = SECRET_KEY
+CORS(app,expose_headers=["Content-Disposition"],supports_credentials=True) # This will enable CORS for all routes
 
 # --- MySQL Configuration ---
 # Replace with your actual MySQL connection details
@@ -55,12 +58,58 @@ def execute_query(query, args=None, fetchone=False, commit=False):
     cur.close()
     return result
 
-# --- Routes for a Sample Resource (e.g., 'items') ---
+# --- Routes 
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    email = data.get('email')
+    password = data.get('password')
+
+    try:
+        if not email or not password:
+            return jsonify({'error': 'Username and password are required.'}), 400
+        user = execute_query("SELECT * FROM users WHERE email = %s", (email,),fetchone=True)
+        if not user:
+            print(f"User not found for email: {email}")
+            return jsonify({'error': 'Invalid credentials.'}), 401
+        username = user['username']
+        id = user['id']
+        address = user['address']
+        if not user['password'] == password:
+            print(f"Invalid password for user: {username}")
+            return jsonify({'error': 'Invalid credentials.'}), 401
+        
+        token = jwt.encode({
+            'username': username,
+            'id': id,
+            'address': address,
+            'exp': datetime.now() + timedelta(hours=1)
+        }, app.config['SECRET_KEY'], algorithm='HS256')
+        print(f"user logged in {username}: {token}")
+        return jsonify({'token': token, 'username': username, 'id': id, 'address': address}), 200
+    except Exception as e:
+        print(f"Error during login: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/consumption/today', methods=['GET'])
 def get_today_data():
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({'error': 'Missing token'}), 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        decoded = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        print(decoded)
+        user_id = decoded['id']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'Token expired'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Invalid token'}), 401
     startDate = datetime(DATE_TODAY.year, DATE_TODAY.month, DATE_TODAY.day, 0, 0, 0)
     try:
+        house = execute_query("SELECT * FROM houses WHERE user_id = %s", (user_id,),fetchone=True)
         items = execute_query(f"""SELECT 
             date_time,
             house_id,
@@ -83,17 +132,31 @@ def get_today_data():
             refrigerator1 ,
             venthood1 ,
             oven1,
-            total_energy FROM houses_consumption WHERE date_time BETWEEN %s AND %s""",
-            (startDate, DATE_TODAY), fetchone=False)
+            total_energy FROM houses_consumption WHERE house_id = %s AND date_time BETWEEN %s AND %s""",
+            (house['id'],startDate, DATE_TODAY), fetchone=False)
         return jsonify(items), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     
 @app.route('/api/consumption/lastweek', methods=['GET'])
 def get_weekly_totals():
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({'error': 'Missing token'}), 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        decoded = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        print(decoded)
+        user_id = decoded['id']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'Token expired'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Invalid token'}), 401
     startDate = DATE_TODAY - timedelta(days=7)
     startDate = datetime(startDate.year, startDate.month, startDate.day, 0, 0, 0)
     try:
+        house = execute_query("SELECT * FROM houses WHERE user_id = %s", (user_id,),fetchone=True)
         items = execute_query("""
             SELECT 
                 DATE(date_time) as day,
@@ -108,10 +171,10 @@ def get_weekly_totals():
                 SUM(venthood1) as venthood1,
                 SUM(total_energy) as total_consumption
             FROM houses_consumption
-            WHERE date_time BETWEEN %s AND %s
+            WHERE house_id = %s AND date_time BETWEEN %s AND %s
             GROUP BY day
             ORDER BY day ASC
-        """, (startDate, DATE_TODAY), fetchone=False)
+        """, (house['id'],startDate, DATE_TODAY), fetchone=False)
         return jsonify(items), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
