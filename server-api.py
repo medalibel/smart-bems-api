@@ -182,6 +182,19 @@ def get_weekly_totals():
 
 @app.route('/api/consumption/<string:start>/<string:end>', methods=['GET'])
 def get_range_total(start, end):
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({'error': 'Missing token'}), 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        decoded = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        print(decoded)
+        user_id = decoded['id']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'Token expired'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Invalid token'}), 401
     #startDate = datetime(DATE_TODAY.year, DATE_TODAY.month, DATE_TODAY.day, 0, 0, 0)
     query = request.args.get('preset', 'N/A')
     print(f"Query preset: {query}")
@@ -219,6 +232,7 @@ def get_range_total(start, end):
         print(f"Ensure the string exactly matches the format '{format_string}'.")
         return jsonify({'error': f"Ensure the string exactly matches the format '{format_string}'."}), 500
     try:
+        house = execute_query("SELECT * FROM houses WHERE user_id = %s", (user_id,),fetchone=True)
         items = execute_query(f"""
             SELECT 
                 DATE(date_time) as day,
@@ -233,16 +247,31 @@ def get_range_total(start, end):
                 SUM(venthood1) as venthood1,
                 SUM(total_energy) as total_consumption
             FROM houses_consumption
-            WHERE date_time BETWEEN %s AND %s
+            WHERE house_id = %s AND date_time BETWEEN %s AND %s
             GROUP BY day
             ORDER BY day ASC""",
-            (parsed_startdate, parsed_enddate), fetchone=False)
+            (house['id'],parsed_startdate, parsed_enddate), fetchone=False)
         return jsonify(items), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/consumption/download/<string:start>/<string:end>', methods=['GET'])
 def download_consumption_data(start, end):
+
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({'error': 'Missing token'}), 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        decoded = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        print(decoded)
+        user_id = decoded['id']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'Token expired'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Invalid token'}), 401
+
     format_string = "%Y-%m-%d"
     try:
         
@@ -272,6 +301,7 @@ def download_consumption_data(start, end):
         print(f"Ensure the string exactly matches the format '{format_string}'.")
         return jsonify({'error': f"Ensure the string exactly matches the format '{format_string}'."}), 500
     try:
+        house = execute_query("SELECT * FROM houses WHERE user_id = %s", (user_id,),fetchone=True)
         query = f"""
             SELECT 
                 DATE(date_time) as day,
@@ -286,11 +316,11 @@ def download_consumption_data(start, end):
                 SUM(venthood1) as venthood1,
                 SUM(total_energy) as total_consumption
             FROM houses_consumption
-            WHERE date_time BETWEEN %s AND %s
+            WHERE house_id = %s AND date_time BETWEEN %s AND %s
             GROUP BY day
             ORDER BY day ASC"""
         cur = mysql.connection.cursor()
-        cur.execute(query, (parsed_startdate, parsed_enddate))
+        cur.execute(query, (house['id'],parsed_startdate, parsed_enddate))
         result = cur.fetchall()
         # Get column names for dictionary formatting
         columns = [desc[0] for desc in cur.description]
@@ -342,6 +372,19 @@ def download_consumption_data(start, end):
 
 @app.route('/api/consumption/quarter/<int:quarter>/<int:year>', methods=['GET'])
 def get_quarter_data(quarter, year):
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({'error': 'Missing token'}), 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        decoded = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        print(decoded)
+        user_id = decoded['id']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'Token expired'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Invalid token'}), 401
 
     if quarter == 1:
         start = datetime(year,1,1,0,0,0)
@@ -364,6 +407,7 @@ def get_quarter_data(quarter, year):
         end = DATE_TODAY
     
     try:
+        house = execute_query("SELECT * FROM houses WHERE user_id = %s", (user_id,),fetchone=True)
         items = execute_query(f"""
             SELECT 
                 DATE(date_time) as day,
@@ -378,16 +422,29 @@ def get_quarter_data(quarter, year):
                 SUM(venthood1) as venthood1,
                 SUM(total_energy) as total_consumption
             FROM houses_consumption
-            WHERE date_time BETWEEN %s AND %s
+            WHERE house_id = %s AND date_time BETWEEN %s AND %s
             GROUP BY day
             ORDER BY day ASC""",
-            (start, end), fetchone=False)
+            (house['id'],start, end), fetchone=False)
         return jsonify(items), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     
 @app.route('/api/bills/download/<int:quarter>/<int:year>', methods=['GET'])
 def download_bill_data(quarter, year):
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({'error': 'Missing token'}), 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        decoded = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        print(decoded)
+        user_id = decoded['id']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'Token expired'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Invalid token'}), 401
 
     if quarter == 1:
         start = datetime(year,1,1,0,0,0)
@@ -410,6 +467,7 @@ def download_bill_data(quarter, year):
         end = DATE_TODAY
     
     try:
+        house = execute_query("SELECT * FROM houses WHERE user_id = %s", (user_id,),fetchone=True)
         query = f"""
             SELECT 
                 DATE(date_time) as day,
@@ -424,11 +482,11 @@ def download_bill_data(quarter, year):
                 SUM(venthood1) as venthood1,
                 SUM(total_energy) as total_consumption
             FROM houses_consumption
-            WHERE date_time BETWEEN %s AND %s
+            WHERE house_id = %s AND date_time BETWEEN %s AND %s
             GROUP BY day
             ORDER BY day ASC"""
         cur = mysql.connection.cursor()
-        cur.execute(query, (start, end))
+        cur.execute(query, (house['id'],start, end))
         result = cur.fetchall()
         # Get column names for dictionary formatting
         columns = [desc[0] for desc in cur.description]
@@ -479,17 +537,32 @@ def download_bill_data(quarter, year):
 
 @app.route('/api/bills', methods=['GET'])
 def get_bills_data():
+    
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({'error': 'Missing token'}), 401
+
+    token = auth_header.split(" ")[1]
     try:
+        decoded = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        print(decoded)
+        user_id = decoded['id']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'Token expired'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Invalid token'}), 401
+    try:
+        house = execute_query("SELECT * FROM houses WHERE user_id = %s", (user_id,),fetchone=True)
         items = execute_query(f"""
             SELECT
                 DATE_FORMAT(date_time, '%%Y-%%m') AS month,
                 SUM(total_energy) AS monthly_consumption,
                 COUNT(*) AS total_records
             FROM houses_consumption
-            WHERE date_time <= %s
+            WHERE house_id = %s AND date_time <= %s
             GROUP BY DATE_FORMAT(date_time, '%%Y-%%m')
             ORDER BY month ASC""",
-            (DATE_TODAY,), fetchone=False)
+            (house['id'],DATE_TODAY), fetchone=False)
         return jsonify(items), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
