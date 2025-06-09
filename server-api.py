@@ -567,6 +567,81 @@ def get_bills_data():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/user', methods=['GET'])
+def get_user_data():
+    
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({'error': 'Missing token'}), 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        decoded = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        print(decoded)
+        user_id = decoded['id']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'Token expired'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Invalid token'}), 401
+    try:
+        user_data = execute_query(f"""
+            SELECT 
+            users.username, 
+            users.email,
+            users.phone_number, 
+            users.address, 
+            houses.construction_year, 
+            houses.total_square_footage, 
+            houses.first_floor_square_footage, 
+            houses.state, 
+            houses.city, 
+            houses.building_type
+            FROM users
+            INNER JOIN houses ON users.id = houses.user_id
+            WHERE users.id = %s""",
+            (user_id,), fetchone=True)
+        return jsonify(user_data), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/user/update', methods=['POST'])
+def update_user():
+    
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({'error': 'Missing token'}), 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        decoded = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        print(decoded)
+        user_id = decoded['id']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'Token expired'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Invalid token'}), 401
+    
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Missing request body'}), 400
+    
+    username = data.get('username')
+    email = data.get('email')
+    phone_number = data.get('phone_number')
+
+    if not username or not email or not phone_number:
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    try:
+        execute_query(f"""
+            UPDATE users 
+            SET username = %s, email = %s, phone_number = %s 
+            WHERE id = %s
+        """, (username, email, phone_number, user_id),commit=True)
+        return jsonify({'message': 'User updated successfully'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # basic route for testing
 @app.route('/')
 def index():
