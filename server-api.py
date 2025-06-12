@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request, Response, send_file
 from flask_mysqldb import MySQL
 from flask_cors import CORS
+import pandas as pd
 import jwt
 import os
 import io
@@ -252,6 +253,41 @@ def get_range_total(start, end):
             ORDER BY day ASC""",
             (house['id'],parsed_startdate, parsed_enddate), fetchone=False)
         return jsonify(items), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@app.route('/api/temp/<int:preset>', methods=['GET'])
+def get_temp_data(preset):
+
+    if preset != 'N/A':
+        parsed_startdate = datetime(DATE_TODAY.year, DATE_TODAY.month, DATE_TODAY.day, 0, 0, 0)
+        parsed_enddate = DATE_TODAY + timedelta(days=int(preset))
+        parsed_enddate = datetime(parsed_enddate.year,parsed_enddate.month,parsed_enddate.day,23,59,59)
+    else:
+        return jsonify({'error': 'invalid preset'}), 400
+    
+    try:
+        weather_df = pd.read_csv('../data/weather_data.csv')
+        # Parse datetime column
+        weather_df['local_15min'] = pd.to_datetime(weather_df['local_15min'])
+        filtered_df = weather_df[
+            (weather_df['local_15min'] >= parsed_startdate) & 
+            (weather_df['local_15min'] <= parsed_enddate)
+        ]
+        # Group by day and calculate average temperature
+        daily_avg_df = filtered_df.copy()
+        daily_avg_df['date'] = daily_avg_df['local_15min'].dt.date
+
+        # Group by date and calculate mean temperature
+        grouped = daily_avg_df.groupby('date')['temp'].mean().reset_index()
+
+        # Optional: Rename columns
+        grouped.columns = ['date', 'avg_temp']
+
+        # Convert to list of dicts
+        result = grouped.to_dict(orient='records')
+
+        return jsonify(result), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -639,6 +675,57 @@ def update_user():
             WHERE id = %s
         """, (username, email, phone_number, user_id),commit=True)
         return jsonify({'message': 'User updated successfully'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@app.route('/api/forecast/<int:preset>', methods=['GET'])
+def forecast_data(preset):
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({'error': 'Missing token'}), 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        decoded = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        print(decoded)
+        user_id = decoded['id']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'Token expired'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Invalid token'}), 401
+    
+    if preset != 'N/A':
+        parsed_startdate = datetime(DATE_TODAY.year, DATE_TODAY.month, DATE_TODAY.day, 0, 0, 0)
+        parsed_enddate = DATE_TODAY + timedelta(days=int(preset))
+        parsed_enddate = datetime(parsed_enddate.year,parsed_enddate.month,parsed_enddate.day,23,59,59)
+    else:
+        return jsonify({'error': 'invalid preset'}), 400
+    
+    try:
+        #DISCLAMER-------------------------------------------------------------------
+        #this is just for testing 
+        #when finished use the prediction script to do real energy forecasting
+        df = pd.read_csv('../data/house_3538.csv')
+        # Parse datetime column
+        df['local_15min'] = pd.to_datetime(df['local_15min'])
+        filtered_df = df[
+            (df['local_15min'] >= parsed_startdate) & 
+            (df['local_15min'] <= parsed_enddate)
+        ]
+        # Group by day and calculate average temperature
+        daily_avg_df = filtered_df.copy()
+        daily_avg_df['date'] = daily_avg_df['local_15min'].dt.date
+
+        # Group by date and calculate mean temperature
+        grouped = daily_avg_df.groupby('date')['total_energy'].sum().reset_index()
+
+        # Optional: Rename columns
+        grouped.columns = ['date', 'total_energy']
+
+        # Convert to list of dicts
+        result = grouped.to_dict(orient='records')
+
+        return jsonify(result), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
