@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from datetime import datetime,timedelta
 from decimal import Decimal
 from datetime import date
+import report
 
 
 load_dotenv()
@@ -728,6 +729,57 @@ def forecast_data(preset):
         return jsonify(result), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/report/<string:day>', methods=['GET'])
+def get_report(day):
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({'error': 'Missing token'}), 401
+
+    token = auth_header.split(" ")[1]
+    try:
+        decoded = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        print(decoded)
+        user_id = decoded['id']
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'Token expired'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'Invalid token'}), 401
+    
+    file_path = 'llm_daily_report.txt'
+
+    format_string = "%Y-%m-%d"
+    selected_date = datetime.strptime(day, format_string)
+    selected_date = selected_date.date()
+    if selected_date > DATE_TODAY.date():
+        return jsonify({'error': 'Date cant be after todays date'}), 404
+    
+    try:
+        
+        # 1. Check if the file exists
+        if not os.path.exists(file_path):
+            print('file does not exist generating report')
+            #get the user's house id from th db
+            #using the 3538 house id just for now 
+            
+            report.generate_report(3538,selected_date)
+
+            
+        
+        # 4. Read the content of the file
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # 5. Return the content with appropriate MIME type
+        # For plain text, 'text/plain' is correct.
+        return Response(content, mimetype='text/plain')
+
+    except Exception as e:
+        print(e)
+        # Handle potential errors during file reading (e.g., permission issues)
+        return jsonify({"error": f"An error occurred while reading the file: {str(e)}"}), 500
+
 
 # basic route for testing
 @app.route('/')
